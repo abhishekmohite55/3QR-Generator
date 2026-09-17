@@ -1,0 +1,1452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>3QR STUDIO — Solid CAD Block &amp; Slicer Workbench</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.3.1/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+  :root {
+    --bg-app: #121418;
+    --panel-bg: #181b22;
+    --panel-bg2: #1e222b;
+    --border-color: #2a2f3d;
+    --border-soft: #212530;
+    --text-main: #f0f2f5;
+    --text-muted: #8c93a0;
+    --text-dim: #5c6270;
+    --accent-orange: #ff6b00;
+    --accent-blue: #0088ff;
+    --accent-green: #00be62;
+    --accent-glow: rgba(0, 136, 255, 0.2);
+    --insert-color: #f59e0b;
+    --insert-bg: #3d2808;
+    --danger: #ef4444;
+    --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+    --font-sans: 'Space Grotesk', system-ui, sans-serif;
+    --radius-sm: 4px;
+    --radius-md: 6px;
+    --transition-fast: 0.12s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  :root[data-theme="light"] {
+    --bg-app: #eef1f6;
+    --panel-bg: #ffffff;
+    --panel-bg2: #f4f6fa;
+    --border-color: #d2d7e2;
+    --border-soft: #e2e6f0;
+    --text-main: #111827;
+    --text-muted: #64748b;
+    --text-dim: #94a3b8;
+    --accent-orange: #e65100;
+    --accent-blue: #2563eb;
+    --accent-green: #059669;
+    --accent-glow: rgba(37, 99, 235, 0.15);
+    --insert-color: #d97706;
+    --insert-bg: #fef3c7;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg-app); color: var(--text-main); font-family: var(--font-sans); }
+  body { height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+
+  /* TOP APPLICATION BAR (Fusion 360 / Bambu Studio Style) */
+  .top-app-bar {
+    height: 48px;
+    background: var(--panel-bg);
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    z-index: 100;
+    flex-shrink: 0;
+  }
+  .app-brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 15px; letter-spacing: -0.02em; }
+  .app-brand .logo-icon { width: 24px; height: 24px; background: linear-gradient(135deg, var(--accent-blue), var(--accent-orange)); border-radius: 5px; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #fff; font-family: var(--font-mono); font-weight: 800; }
+  .app-brand .version-tag { font-size: 10px; font-family: var(--font-mono); color: var(--accent-blue); background: rgba(0,136,255,0.12); padding: 2px 6px; border-radius: 4px; }
+
+  .workspace-tabs { display: flex; gap: 2px; background: var(--panel-bg2); padding: 3px; border-radius: 6px; border: 1px solid var(--border-color); }
+  .ws-tab { padding: 5px 14px; font-size: 11.5px; font-weight: 600; font-family: var(--font-mono); color: var(--text-muted); border: none; background: transparent; cursor: pointer; border-radius: 4px; transition: all var(--transition-fast); }
+  .ws-tab.active { background: var(--panel-bg); color: var(--text-main); box-shadow: 0 1px 4px rgba(0,0,0,0.15); }
+
+  .top-tools { display: flex; align-items: center; gap: 8px; }
+  .tool-btn { background: var(--panel-bg2); border: 1px solid var(--border-color); color: var(--text-main); border-radius: var(--radius-sm); padding: 5px 10px; font-size: 11.5px; font-family: var(--font-mono); cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all var(--transition-fast); }
+  .tool-btn:hover { border-color: var(--accent-blue); color: var(--accent-blue); }
+  .tool-btn.active { background: var(--accent-glow); border-color: var(--accent-blue); color: var(--accent-blue); }
+
+  /* MAIN WORKSPACE SPLIT */
+  .workspace-body { flex: 1; display: grid; grid-template-columns: 380px 1fr; overflow: hidden; }
+
+  /* LEFT CAD FEATURE TREE SIDEBAR */
+  .sidebar { background: var(--panel-bg); border-right: 1px solid var(--border-color); overflow-y: auto; display: flex; flex-direction: column; }
+  
+  .tree-section { border-bottom: 1px solid var(--border-soft); }
+  .tree-header { padding: 12px 16px; font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; display: flex; align-items: center; justify-content: space-between; cursor: pointer; user-select: none; background: rgba(0,0,0,0.1); }
+  .tree-header:hover { color: var(--text-main); }
+  .tree-body { padding: 12px 16px; display: flex; flex-direction: column; gap: 10px; }
+
+  /* Input & Slider styling */
+  .field-wrap { display: flex; flex-direction: column; gap: 3px; }
+  .label-row { display: flex; justify-content: space-between; align-items: center; }
+  .label-row label { margin-bottom: 0; font-size: 11px; font-weight: 500; color: var(--text-muted); }
+
+  .num-input {
+    font-family: var(--font-mono);
+    background: var(--panel-bg2);
+    color: var(--text-main);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 3px 6px;
+    font-size: 11.5px;
+    width: 60px;
+    text-align: right;
+  }
+  .num-input:focus { outline: none; border-color: var(--accent-blue); }
+
+  input[type="text"], select {
+    font-family: var(--font-mono);
+    background: var(--panel-bg2);
+    color: var(--text-main);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 6px 8px;
+    font-size: 12px;
+    width: 100%;
+  }
+
+  .range-slider {
+    width: 100%;
+    height: 4px;
+    accent-color: var(--accent-blue);
+    cursor: pointer;
+    background: var(--border-color);
+    border-radius: 2px;
+  }
+
+  .row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+  .row.two { grid-template-columns: 1fr 1fr; }
+  .row.one { grid-template-columns: 1fr; }
+  .unit { color: var(--text-dim); font-size: 10px; }
+
+  .seg { display: flex; border: 1px solid var(--border-color); border-radius: 4px; overflow: hidden; background: var(--panel-bg2); }
+  .seg button {
+    flex: 1; background: transparent; color: var(--text-muted); border: none; padding: 6px;
+    font-family: var(--font-mono); font-size: 10.5px; cursor: pointer; border-right: 1px solid var(--border-color);
+  }
+  .seg button:last-child { border-right: none; }
+  .seg button.active { background: var(--accent-glow); color: var(--accent-blue); font-weight: 600; }
+
+  .presets { display: flex; flex-wrap: wrap; gap: 4px; }
+  .preset-btn {
+    background: var(--panel-bg2); border: 1px solid var(--border-color); color: var(--text-muted);
+    border-radius: 4px; padding: 3px 6px; font-size: 10px; font-family: var(--font-mono); cursor: pointer;
+  }
+  .preset-btn:hover { border-color: var(--accent-blue); color: var(--text-main); }
+
+  /* Dynamic 2D Schematic Drawer */
+  .schematic-box { background: var(--panel-bg2); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px; }
+  .schematic-box svg { width: 100%; height: auto; display: block; }
+
+  /* 3D WORKBENCH VIEWPORT */
+  .viewport-container { position: relative; width: 100%; height: 100%; background: radial-gradient(circle at 50% 40%, #1c2029, #0f1115); }
+  #canvasWrap { width: 100%; height: 100%; }
+  #canvasWrap canvas { display: block; width: 100%; height: 100%; outline: none; }
+
+  /* FUSION 360 INTERACTIVE VIEW CUBE */
+  .view-cube-wrap {
+    position: absolute; top: 16px; right: 16px; width: 84px; height: 84px; z-index: 30; perspective: 400px;
+  }
+  .view-cube {
+    width: 100%; height: 100%; position: relative; transform-style: preserve-3d; transition: transform 0.25s ease-out; cursor: pointer;
+  }
+  .cube-face {
+    position: absolute; width: 84px; height: 84px; background: rgba(30,34,43,0.85); border: 1px solid var(--border-color);
+    color: var(--text-muted); font-size: 10px; font-family: var(--font-mono); font-weight: 700;
+    display: flex; align-items: center; justify-content: center; backdrop-filter: blur(8px);
+    transition: background 0.15s, color 0.15s;
+  }
+  .cube-face:hover { background: var(--accent-blue); color: #fff; }
+  .face-front  { transform: translateZ(42px); }
+  .face-back   { transform: rotateY(180deg) translateZ(42px); }
+  .face-right  { transform: rotateY(90deg) translateZ(42px); }
+  .face-left   { transform: rotateY(-90deg) translateZ(42px); }
+  .face-top    { transform: rotateX(90deg) translateZ(42px); }
+  .face-bottom { transform: rotateX(-90deg) translateZ(42px); }
+
+  /* SLICER HUD & STATS OVERLAY */
+  .slicer-hud {
+    position: absolute; top: 16px; left: 16px; background: rgba(24, 27, 34, 0.85); border: 1px solid var(--border-color);
+    border-radius: 6px; padding: 10px 14px; backdrop-filter: blur(10px); z-index: 20; font-family: var(--font-mono); font-size: 11px;
+    display: flex; flex-direction: column; gap: 4px; pointer-events: none;
+  }
+  .slicer-hud .hud-title { font-weight: 700; color: var(--text-muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .slicer-hud .hud-val { color: var(--accent-blue); font-weight: 600; font-size: 12.5px; }
+
+  /* 3D PRINTER LAYER SLICER CONTROL OVERLAY */
+  .slicer-bar {
+    position: absolute; top: 115px; right: 16px; background: rgba(24, 27, 34, 0.88); border: 1px solid var(--border-color);
+    border-radius: 6px; padding: 10px 12px; backdrop-filter: blur(12px); z-index: 20; display: flex; flex-direction: column;
+    align-items: center; gap: 8px; width: 130px; box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+  }
+  .slicer-header { display: flex; align-items: center; justify-content: space-between; width: 100%; font-size: 10px; font-family: var(--font-mono); color: var(--text-muted); border-bottom: 1px solid var(--border-soft); padding-bottom: 4px; }
+  .v-slider-wrap { height: 160px; display: flex; align-items: center; justify-content: center; }
+  .v-slider-wrap input[type="range"] { writing-mode: bt-lr; -webkit-appearance: slider-vertical; width: 8px; height: 100%; accent-color: var(--accent-blue); cursor: pointer; }
+  .slicer-controls-row { display: flex; gap: 4px; width: 100%; justify-content: center; }
+  .slicer-btn { background: var(--panel-bg2); border: 1px solid var(--border-color); color: var(--text-main); border-radius: 4px; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 11px; }
+  .slicer-btn:hover { border-color: var(--accent-blue); color: var(--accent-blue); }
+  .slicer-btn.play { background: var(--accent-glow); color: var(--accent-blue); border-color: var(--accent-blue); }
+
+  .slicer-badge { text-align: center; font-family: var(--font-mono); width: 100%; border-top: 1px solid var(--border-soft); padding-top: 6px; }
+  .slicer-badge .layer-num { font-size: 11.5px; font-weight: 700; color: var(--accent-blue); }
+  .slicer-badge .z-val { color: var(--text-main); font-size: 10.5px; margin-top: 1px; }
+  .slicer-badge .feature-tag { font-size: 9px; color: var(--insert-color); background: var(--insert-bg); padding: 2px 5px; border-radius: 4px; margin-top: 4px; display: inline-block; }
+
+  /* BOTTOM WORKSTATION DOCK (Print Schedule & Export) */
+  .bottom-dock { height: 130px; background: var(--panel-bg); border-top: 1px solid var(--border-color); display: grid; grid-template-columns: 1fr 300px; padding: 10px 16px; gap: 16px; flex-shrink: 0; }
+  .schedule-list { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 4px; }
+  .step-card { background: var(--panel-bg2); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px 12px; min-width: 180px; display: flex; flex-direction: column; gap: 4px; }
+  .step-card .z { font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: var(--accent-blue); }
+  .step-card.insert .z { color: var(--insert-color); }
+  .step-card .title { font-size: 11px; font-weight: 600; }
+  .step-card .desc { font-size: 10px; color: var(--text-muted); line-height: 1.3; }
+
+  .export-btns { display: flex; flex-direction: column; gap: 6px; justify-content: center; }
+  .dl-btn { display: flex; align-items: center; justify-content: space-between; background: var(--panel-bg2); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px 12px; cursor: pointer; color: var(--text-main); font-family: var(--font-sans); font-size: 12px; font-weight: 600; transition: all var(--transition-fast); }
+  .dl-btn:hover:not([disabled]) { border-color: var(--accent-blue); background: var(--accent-glow); }
+  .dl-btn span.sub { font-family: var(--font-mono); font-size: 9.5px; color: var(--text-muted); font-weight: 400; }
+  .dl-btn[disabled] { opacity: 0.4; cursor: not-allowed; }
+
+  /* Toast Notification */
+  .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(100px); background: var(--panel-bg); border: 1px solid var(--accent-blue); color: var(--text-main); padding: 8px 16px; border-radius: 30px; font-size: 12px; font-family: var(--font-mono); box-shadow: 0 10px 25px rgba(0,0,0,0.4); transition: transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275); z-index: 100; pointer-events: none; }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<!-- TOP APPLICATION BAR -->
+<header class="top-app-bar">
+  <div class="app-brand">
+    <div class="logo-icon">3Q</div>
+    <span>3QR STUDIO</span>
+    <span class="version-tag">CAD v3.0</span>
+  </div>
+
+  <div class="workspace-tabs">
+    <button class="ws-tab active" id="tabPrepare">PREPARE</button>
+    <button class="ws-tab" id="tabSlicer">SLICER PREVIEW</button>
+  </div>
+
+  <div class="top-tools">
+    <button class="tool-btn active" id="modeShadedBtn" title="Shaded CAD Material">🎨 Solid</button>
+    <button class="tool-btn active" id="modeEdgesBtn" title="Show CAD Edge Lines">✏️ Edges</button>
+    <button class="tool-btn" id="modeXrayBtn" title="X-Ray Internal Inspection">🔍 X-Ray</button>
+    <button class="tool-btn" id="resetCamBtn" title="Reset Camera View">🎥 Home</button>
+    <button class="tool-btn" id="themeToggleBtn" title="Toggle Dark/Light Workstation">🌓 Theme</button>
+  </div>
+</header>
+
+<div class="workspace-body">
+
+  <!-- LEFT CAD FEATURE TREE SIDEBAR -->
+  <aside class="sidebar">
+    
+    <!-- 1. PROJECT & QR SOURCE -->
+    <div class="tree-section">
+      <div class="tree-header" onclick="toggleSection('secQr')">
+        <span>📁 1. QR Source &amp; Relief</span>
+        <span id="secQr_arrow">▼</span>
+      </div>
+      <div class="tree-body" id="secQr">
+        <div class="field-wrap">
+          <label for="qrUrl">Target URL / Text String</label>
+          <input id="qrUrl" type="text" value="https://claude.ai" spellcheck="false">
+        </div>
+        <div class="row two">
+          <div>
+            <label for="qrEcc">Error Correction</label>
+            <select id="qrEcc">
+              <option value="L">L — 7%</option>
+              <option value="M" selected>M — 15%</option>
+              <option value="Q">Q — 25%</option>
+              <option value="H">H — 30%</option>
+            </select>
+          </div>
+          <div class="field-wrap">
+            <div class="label-row"><label for="qrReliefH">Relief H <span class="unit">mm</span></label><input id="qrReliefH" type="number" step="0.05" value="0.6" class="num-input"></div>
+            <input id="qrReliefH_slider" type="range" min="0.2" max="3.0" step="0.05" value="0.6" class="range-slider">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. BLOCK FOOTPRINT -->
+    <div class="tree-section">
+      <div class="tree-header" onclick="toggleSection('secFootprint')">
+        <span>🧊 2. Block Footprint</span>
+        <span id="secFootprint_arrow">▼</span>
+      </div>
+      <div class="tree-body" id="secFootprint">
+        <div class="row two">
+          <div class="field-wrap">
+            <div class="label-row"><label for="blockL">Length X <span class="unit">mm</span></label><input id="blockL" type="number" step="0.5" value="70" class="num-input"></div>
+            <input id="blockL_slider" type="range" min="30" max="150" step="0.5" value="70" class="range-slider">
+          </div>
+          <div class="field-wrap">
+            <div class="label-row"><label for="blockW">Width Y <span class="unit">mm</span></label><input id="blockW" type="number" step="0.5" value="70" class="num-input"></div>
+            <input id="blockW_slider" type="range" min="30" max="150" step="0.5" value="70" class="range-slider">
+          </div>
+        </div>
+        <div class="row two">
+          <div class="field-wrap">
+            <div class="label-row"><label for="wallMargin">Margin <span class="unit">mm</span></label><input id="wallMargin" type="number" step="0.1" value="2.0" class="num-input"></div>
+            <input id="wallMargin_slider" type="range" min="0.5" max="10.0" step="0.1" value="2.0" class="range-slider">
+          </div>
+          <div class="field-wrap">
+            <div class="label-row"><label for="clearance">Clearance <span class="unit">mm</span></label><input id="clearance" type="number" step="0.05" value="0.2" class="num-input"></div>
+            <input id="clearance_slider" type="range" min="0.05" max="1.0" step="0.05" value="0.2" class="range-slider">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. BASE FLOOR & MAGNET POCKET -->
+    <div class="tree-section">
+      <div class="tree-header" onclick="toggleSection('secMagnet')">
+        <span>🧲 3. Magnet Pocket Feature</span>
+        <span id="secMagnet_arrow">▼</span>
+      </div>
+      <div class="tree-body" id="secMagnet">
+        <div class="seg" id="baseFloorSeg">
+          <button data-val="0" class="active">Flush (0mm)</button>
+          <button data-val="custom">Custom Floor</button>
+        </div>
+        <div class="row two" id="baseFloorCustomRow" style="display:none">
+          <div class="field-wrap">
+            <div class="label-row"><label for="baseFloorH">Floor Thick <span class="unit">mm</span></label><input id="baseFloorH" type="number" step="0.05" value="0.8" class="num-input"></div>
+            <input id="baseFloorH_slider" type="range" min="0.2" max="5.0" step="0.05" value="0.8" class="range-slider">
+          </div>
+          <div class="field-wrap">
+            <div class="label-row"><label for="layerH">Layer Height <span class="unit">mm</span></label><input id="layerH" type="number" step="0.01" value="0.2" class="num-input"></div>
+            <input id="layerH_slider" type="range" min="0.08" max="0.32" step="0.01" value="0.2" class="range-slider">
+          </div>
+        </div>
+        <div class="presets">
+          <button class="preset-btn" onclick="applyPreset('mag', 30, 20, 1.5)">30×20×1.5mm</button>
+          <button class="preset-btn" onclick="applyPreset('mag', 20, 10, 1.0)">20×10×1.0mm</button>
+          <button class="preset-btn" onclick="applyPreset('mag', 10, 10, 2.0)">10mm Disc</button>
+        </div>
+        <div class="row">
+          <div class="field-wrap"><div class="label-row"><label for="magL">Length</label><input id="magL" type="number" step="0.1" value="30" class="num-input"></div><input id="magL_slider" type="range" min="5" max="100" step="0.5" value="30" class="range-slider"></div>
+          <div class="field-wrap"><div class="label-row"><label for="magW">Width</label><input id="magW" type="number" step="0.1" value="20" class="num-input"></div><input id="magW_slider" type="range" min="5" max="100" step="0.5" value="20" class="range-slider"></div>
+          <div class="field-wrap"><div class="label-row"><label for="magT">Thick</label><input id="magT" type="number" step="0.1" value="1.5" class="num-input"></div><input id="magT_slider" type="range" min="0.5" max="6.0" step="0.1" value="1.5" class="range-slider"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. NFC TAG CAVITY -->
+    <div class="tree-section">
+      <div class="tree-header" onclick="toggleSection('secNfc')">
+        <span>📡 4. NFC Tag Feature</span>
+        <span id="secNfc_arrow">▼</span>
+      </div>
+      <div class="tree-body" id="secNfc">
+        <div class="field-wrap">
+          <div class="label-row"><label for="gap1">Spacer Thickness <span class="unit">mm</span></label><input id="gap1" type="number" step="0.05" value="0.6" class="num-input"></div>
+          <input id="gap1_slider" type="range" min="0.2" max="4.0" step="0.05" value="0.6" class="range-slider">
+        </div>
+        <div class="presets">
+          <button class="preset-btn" onclick="applyPreset('nfc', 'circ', 12.5, 0.4)">NTAG215 Round Ø25mm</button>
+          <button class="preset-btn" onclick="applyPreset('nfc', 'rect', 25, 25, 0.4)">NTAG215 Square 25mm</button>
+        </div>
+        <div class="seg" id="nfcShapeSeg">
+          <button data-val="rect" class="active">Square / Rect</button>
+          <button data-val="circ">Circular</button>
+        </div>
+        <div class="row" id="nfcRectRow">
+          <div class="field-wrap"><div class="label-row"><label for="nfcL">Length</label><input id="nfcL" type="number" step="0.1" value="25" class="num-input"></div><input id="nfcL_slider" type="range" min="5" max="80" step="0.5" value="25" class="range-slider"></div>
+          <div class="field-wrap"><div class="label-row"><label for="nfcW">Width</label><input id="nfcW" type="number" step="0.1" value="25" class="num-input"></div><input id="nfcW_slider" type="range" min="5" max="80" step="0.5" value="25" class="range-slider"></div>
+          <div class="field-wrap"><div class="label-row"><label for="nfcT">Thick</label><input id="nfcT" type="number" step="0.1" value="0.4" class="num-input"></div><input id="nfcT_slider" type="range" min="0.1" max="3.0" step="0.05" value="0.4" class="range-slider"></div>
+        </div>
+        <div class="row two" id="nfcCircRow" style="display:none">
+          <div class="field-wrap"><div class="label-row"><label for="nfcR">Radius <span class="unit">mm</span></label><input id="nfcR" type="number" step="0.1" value="12.5" class="num-input"></div><input id="nfcR_slider" type="range" min="2.5" max="40" step="0.5" value="12.5" class="range-slider"></div>
+          <div class="field-wrap"><div class="label-row"><label for="nfcT2">Thick <span class="unit">mm</span></label><input id="nfcT2" type="number" step="0.1" value="0.4" class="num-input"></div><input id="nfcT2_slider" type="range" min="0.1" max="3.0" step="0.05" value="0.4" class="range-slider"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5. CAP FILL & SCHEMATIC -->
+    <div class="tree-section">
+      <div class="tree-header" onclick="toggleSection('secCap')">
+        <span>🛡️ 5. Cap Surface &amp; Z-Stack</span>
+        <span id="secCap_arrow">▼</span>
+      </div>
+      <div class="tree-body" id="secCap">
+        <div class="field-wrap">
+          <div class="label-row"><label for="capFill">Cap Fill Thickness <span class="unit">mm</span></label><input id="capFill" type="number" step="0.05" value="0.8" class="num-input"></div>
+          <input id="capFill_slider" type="range" min="0.2" max="4.0" step="0.05" value="0.8" class="range-slider">
+        </div>
+        <div id="validation"></div>
+        <div class="schematic-box">
+          <svg id="schematicSvg" viewBox="0 0 340 180"></svg>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- 3D WORKBENCH VIEWPORT -->
+  <main class="viewport-container">
+    <div id="canvasWrap"></div>
+
+    <!-- FUSION 360 INTERACTIVE VIEW CUBE -->
+    <div class="view-cube-wrap">
+      <div class="view-cube" id="viewCube">
+        <div class="cube-face face-front" onclick="snapCamera('front')">FRONT</div>
+        <div class="cube-face face-back" onclick="snapCamera('back')">BACK</div>
+        <div class="cube-face face-right" onclick="snapCamera('right')">RIGHT</div>
+        <div class="cube-face face-left" onclick="snapCamera('left')">LEFT</div>
+        <div class="cube-face face-top" onclick="snapCamera('top')">TOP</div>
+        <div class="cube-face face-bottom" onclick="snapCamera('bottom')">BOTTOM</div>
+      </div>
+    </div>
+
+    <!-- SLICER HUD STATS -->
+    <div class="slicer-hud">
+      <span class="hud-title">MODEL STATISTICS</span>
+      <span id="hudDimensions" class="hud-val">70 × 70 × 4.70 mm</span>
+      <span id="hudVolume" style="color:var(--text-muted)">Volume: ~21.5 cm³</span>
+      <span id="hudWeight" style="color:var(--accent-green)">PLA Mass: ~26.6 g</span>
+    </div>
+
+    <!-- 3D PRINTER LAYER SLICER CONTROL OVERLAY -->
+    <div class="slicer-bar" id="slicerBar">
+      <div class="slicer-header">
+        <span>SLICER INSPECT</span>
+        <button class="slicer-btn" id="slicerResetBtn" style="width:auto; height:18px; font-size:9px; padding:0 4px;">TOP</button>
+      </div>
+      
+      <div class="slicer-controls-row">
+        <button class="slicer-btn" id="layerUpBtn" title="Step Layer Up">▲</button>
+        <button class="slicer-btn play" id="layerPlayBtn" title="Play Build Animation">▶</button>
+        <button class="slicer-btn" id="layerDownBtn" title="Step Layer Down">▼</button>
+      </div>
+
+      <div class="v-slider-wrap">
+        <input type="range" id="layerSlider" min="1" max="24" value="24" orient="vertical">
+      </div>
+
+      <div class="slicer-badge">
+        <div class="layer-num" id="slicerLayerText">Layer 24 / 24</div>
+        <div class="z-val" id="slicerZText">Z = 4.70 mm</div>
+        <div class="feature-tag" id="slicerFeatureText">QR Relief</div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- BOTTOM WORKSTATION DOCK -->
+<footer class="bottom-dock">
+  <div style="display:flex; flex-direction:column; gap:6px; overflow:hidden;">
+    <div style="font-size:11px; font-weight:700; color:var(--text-muted); font-family:var(--font-mono); text-transform:uppercase;">Print Pause &amp; Filament-Change Schedule</div>
+    <div class="schedule-list" id="scheduleList"></div>
+  </div>
+  <div class="export-btns">
+    <button class="dl-btn" id="dlStl" disabled>
+      <span>Download STL Mesh<br><span class="sub">Single body manifold STL</span></span>
+      <span>↓</span>
+    </button>
+    <button class="dl-btn" id="dl3mf" disabled>
+      <span>Download 3MF Colored<br><span class="sub">Dual object 3MF package</span></span>
+      <span>↓</span>
+    </button>
+  </div>
+</footer>
+
+<div class="toast" id="toast">Notification</div>
+
+<!-- ======================================================================
+     WEB WORKER CODE — SEAMLESS SOLID BLOCK GEOMETRY BUILDER
+     ====================================================================== */ -->
+<script id="workerScript" type="worker-script">
+function polyArea2D(pts){
+  let a=0; for(let i=0;i<pts.length;i++){
+    const [x1,y1]=pts[i], [x2,y2]=pts[(i+1)%pts.length];
+    a += x1*y2 - x2*y1;
+  }
+  return a/2;
+}
+function ensureCCW(pts){ return polyArea2D(pts) < 0 ? pts.slice().reverse() : pts.slice(); }
+function ensureCW(pts){ return polyArea2D(pts) > 0 ? pts.slice().reverse() : pts.slice(); }
+function sign(p1,p2,p3){ return (p1[0]-p3[0])*(p2[1]-p3[1]) - (p2[0]-p3[0])*(p1[1]-p3[1]); }
+function pointInTriangle(p,a,b,c){
+  const d1=sign(p,a,b), d2=sign(p,b,c), d3=sign(p,c,a);
+  const hasNeg=(d1<0)||(d2<0)||(d3<0), hasPos=(d1>0)||(d2>0)||(d3>0);
+  return !(hasNeg && hasPos);
+}
+function earClip(pts){
+  const n=pts.length; if(n<3) return [];
+  const idx=pts.map((_,i)=>i); const tris=[]; let guard=0;
+  while(idx.length>3 && guard<20000){
+    guard++; let earFound=false;
+    for(let i=0;i<idx.length;i++){
+      const i0=idx[(i-1+idx.length)%idx.length], i1=idx[i], i2=idx[(i+1)%idx.length];
+      const a=pts[i0], b=pts[i1], c=pts[i2];
+      const cross=(b[0]-a[0])*(c[1]-a[1]) - (b[1]-a[1])*(c[0]-a[0]);
+      if(cross<=1e-9) continue;
+      let contains=false;
+      for(const j of idx){
+        if(j===i0||j===i1||j===i2) continue;
+        if(pointInTriangle(pts[j],a,b,c)){ contains=true; break; }
+      }
+      if(contains) continue;
+      tris.push([i0,i1,i2]); idx.splice(i,1); earFound=true; break;
+    }
+    if(!earFound) break;
+  }
+  if(idx.length===3) tris.push([idx[0],idx[1],idx[2]]);
+  return tris;
+}
+function rectPoly(x0,y0,x1,y1){ return [[x0,y0],[x1,y0],[x1,y1],[x0,y1]]; }
+function circlePoly(cx,cy,r,segments){
+  const pts=[]; for(let i=0;i<segments;i++){ const a=(i/segments)*Math.PI*2; pts.push([cx+r*Math.cos(a), cy+r*Math.sin(a)]); }
+  return pts;
+}
+
+function extrudeWalls(loop,z0,z1,outward){
+  const verts=[], tris=[], n=loop.length;
+  for(const [x,y] of loop) verts.push([x,y,z0]);
+  for(const [x,y] of loop) verts.push([x,y,z1]);
+  for(let i=0;i<n;i++){
+    const a=i, b=(i+1)%n, aTop=i+n, bTop=((i+1)%n)+n;
+    if(outward){ tris.push([a,b,bTop]); tris.push([a,bTop,aTop]); }
+    else { tris.push([a,bTop,b]); tris.push([a,aTop,bTop]); }
+  }
+  return {verts,tris};
+}
+
+function capPolygon(loop,z,facingUp){
+  const pts=loop.map(([x,y])=>[x,y]);
+  const ccw=ensureCCW(pts); const idxTris=earClip(ccw);
+  const verts=ccw.map(([x,y])=>[x,y,z]);
+  const tris=idxTris.map(([a,b,c])=> facingUp?[a,b,c]:[a,c,b]);
+  return {verts,tris};
+}
+
+function mergeMeshes(meshes){
+  const verts=[], tris=[];
+  for(const m of meshes){
+    const offset=verts.length;
+    for(const v of m.verts) verts.push(v);
+    for(const t of m.tris) tris.push([t[0]+offset,t[1]+offset,t[2]+offset]);
+  }
+  return {verts,tris};
+}
+
+self.onmessage = function(e){
+  const p = e.data;
+  const startTime = performance.now();
+
+  const outer = rectPoly(0,0,p.blockL,p.blockW);
+  const cx = p.blockL/2, cy = p.blockW/2;
+  let z = 0;
+
+  // Calculate Heights & Levels
+  const baseFloorZ = p.baseFloorH > 0 ? p.baseFloorH : 0;
+  z = baseFloorZ;
+  const magnetPauseZ = z;
+  const magnetCapZ = z + p.magT;
+  z = magnetCapZ + p.gap1;
+  const nfcPauseZ = z;
+
+  const nfcT = p.nfcShape==='circ' ? p.nfcT2 : p.nfcT;
+  const nfcCapZ = z + nfcT;
+  z = nfcCapZ + p.capFill;
+  const qrSurfaceZ = z;
+
+  // Pocket Geometries
+  const mL = p.magL + p.clearance*2, mW = p.magW + p.clearance*2;
+  const magHole = rectPoly(cx-mL/2, cy-mW/2, cx+mL/2, cy+mW/2);
+
+  let nfcHole;
+  if(p.nfcShape === 'circ'){
+    const r = p.nfcR + p.clearance;
+    nfcHole = circlePoly(cx, cy, r, 48);
+  } else {
+    const nL = p.nfcL + p.clearance*2, nW = p.nfcW + p.clearance*2;
+    nfcHole = rectPoly(cx-nL/2, cy-nW/2, cx+nL/2, cy+nW/2);
+  }
+
+  // SEAMLESS SOLID BODY BUILDING (Continuous Outer Shell)
+  const bodyComponents = [];
+
+  // 1. Single Continuous Outer Vertical Wall (Z=0 to Z=qrSurfaceZ)
+  bodyComponents.push(extrudeWalls(outer, 0, qrSurfaceZ, true));
+
+  // 2. Bottom Cap Polygon (Z=0 facing down)
+  bodyComponents.push(capPolygon(outer, 0, false));
+
+  // 3. Top Surface Cap Polygon (Z=qrSurfaceZ facing up)
+  bodyComponents.push(capPolygon(outer, qrSurfaceZ, true));
+
+  // 4. Internal Magnet Pocket Surfaces (if floor > 0, floor cap; wall cutout, ceiling cap)
+  bodyComponents.push(capPolygon(magHole, magnetPauseZ, true));  // Magnet Floor (facing up inside cavity)
+  bodyComponents.push(capPolygon(magHole, magnetCapZ, false));   // Magnet Ceiling (facing down inside cavity)
+  bodyComponents.push(extrudeWalls(magHole, magnetPauseZ, magnetCapZ, false)); // Magnet Inner Cavity Walls
+
+  // 5. Internal NFC Pocket Surfaces
+  bodyComponents.push(capPolygon(nfcHole, nfcPauseZ, true));   // NFC Floor
+  bodyComponents.push(capPolygon(nfcHole, nfcCapZ, false));    // NFC Ceiling
+  bodyComponents.push(extrudeWalls(nfcHole, nfcPauseZ, nfcCapZ, false)); // NFC Cavity Walls
+
+  // Merge Body Mesh
+  const mergedBlack = mergeMeshes(bodyComponents);
+
+  // 6. Batched White QR Relief Pillars
+  const qrGrid = p.qrGrid;
+  let lightPillarCount = 0;
+  if(qrGrid){
+    for(let r=0; r<qrGrid.length; r++){
+      for(let c=0; c<qrGrid[r].length; c++){
+        if(!qrGrid[r][c]) lightPillarCount++;
+      }
+    }
+  }
+
+  const whiteVerts = new Float32Array(lightPillarCount * 8 * 3);
+  const whiteTris = new Uint32Array(lightPillarCount * 12 * 3);
+
+  let qrModuleSize = 0;
+  if(qrGrid && lightPillarCount > 0){
+    const n = qrGrid.length;
+    const quiet = 4;
+    const span = n + quiet*2;
+    qrModuleSize = Math.min(p.blockL, p.blockW) / span;
+    const qrPixels = qrModuleSize * span;
+    const qrOriginX = cx - qrPixels/2 + quiet*qrModuleSize;
+    const qrOriginY = cy - qrPixels/2 + quiet*qrModuleSize;
+    const shrink = qrModuleSize * 0.04;
+
+    let vIdx = 0, tIdx = 0, pillarIdx = 0;
+    const z0 = qrSurfaceZ, z1 = qrSurfaceZ + p.qrReliefH;
+
+    for(let r=0; r<n; r++){
+      for(let c=0; c<n; c++){
+        if(qrGrid[r][c]) continue;
+
+        const x0 = qrOriginX + c*qrModuleSize + shrink/2;
+        const y0 = qrOriginY + (n-1-r)*qrModuleSize + shrink/2;
+        const x1 = x0 + qrModuleSize - shrink;
+        const y1 = y0 + qrModuleSize - shrink;
+
+        const baseV = pillarIdx * 8;
+        whiteVerts[vIdx++]=x0; whiteVerts[vIdx++]=y0; whiteVerts[vIdx++]=z0;
+        whiteVerts[vIdx++]=x1; whiteVerts[vIdx++]=y0; whiteVerts[vIdx++]=z0;
+        whiteVerts[vIdx++]=x1; whiteVerts[vIdx++]=y1; whiteVerts[vIdx++]=z0;
+        whiteVerts[vIdx++]=x0; whiteVerts[vIdx++]=y1; whiteVerts[vIdx++]=z0;
+        whiteVerts[vIdx++]=x0; whiteVerts[vIdx++]=y0; whiteVerts[vIdx++]=z1;
+        whiteVerts[vIdx++]=x1; whiteVerts[vIdx++]=y0; whiteVerts[vIdx++]=z1;
+        whiteVerts[vIdx++]=x1; whiteVerts[vIdx++]=y1; whiteVerts[vIdx++]=z1;
+        whiteVerts[vIdx++]=x0; whiteVerts[vIdx++]=y1; whiteVerts[vIdx++]=z1;
+
+        const boxTris = [
+          [0,2,1],[0,3,2],[4,5,6],[4,6,7],
+          [0,1,5],[0,5,4],[1,2,6],[1,6,5],
+          [2,3,7],[2,7,6],[3,0,4],[3,4,7]
+        ];
+        for(const [a,b,cIdx] of boxTris){
+          whiteTris[tIdx++] = baseV + a;
+          whiteTris[tIdx++] = baseV + b;
+          whiteTris[tIdx++] = baseV + cIdx;
+        }
+        pillarIdx++;
+      }
+    }
+  }
+
+  const totalHeight = qrSurfaceZ + p.qrReliefH;
+
+  const blackVerts = new Float32Array(mergedBlack.verts.length * 3);
+  for(let i=0; i<mergedBlack.verts.length; i++){
+    blackVerts[i*3] = mergedBlack.verts[i][0];
+    blackVerts[i*3+1] = mergedBlack.verts[i][1];
+    blackVerts[i*3+2] = mergedBlack.verts[i][2];
+  }
+  const blackTris = new Uint32Array(mergedBlack.tris.length * 3);
+  for(let i=0; i<mergedBlack.tris.length; i++){
+    blackTris[i*3] = mergedBlack.tris[i][0];
+    blackTris[i*3+1] = mergedBlack.tris[i][1];
+    blackTris[i*3+2] = mergedBlack.tris[i][2];
+  }
+
+  const buildTime = (performance.now() - startTime).toFixed(1);
+
+  const schedule = [
+    {z: magnetPauseZ, kind:'insert', label:'Pause — Insert Magnet Sheet', detail:`Pocket floor at Z=${magnetPauseZ.toFixed(2)}mm. Insert ${p.magL}×${p.magW}×${p.magT}mm sheet.`},
+    {z: magnetCapZ, kind:'info', label:'Magnet Pocket Sealed', detail:`Print closes over magnet at Z=${magnetCapZ.toFixed(2)}mm.`},
+    {z: nfcPauseZ, kind:'insert', label:'Pause — Insert NFC Tag', detail:`Pocket floor at Z=${nfcPauseZ.toFixed(2)}mm. Insert NFC tag.`},
+    {z: nfcCapZ, kind:'info', label:'NFC Pocket Sealed', detail:`Print closes over NFC tag at Z=${nfcCapZ.toFixed(2)}mm.`},
+    {z: qrSurfaceZ, kind:'filament', label:'Filament Change — Black → White', detail:`Swap to white filament for QR relief at Z=${qrSurfaceZ.toFixed(2)}mm.`},
+  ];
+
+  self.postMessage({
+    blackVerts, blackTris,
+    whiteVerts, whiteTris,
+    totalHeight,
+    magnetPauseZ, magnetCapZ, nfcPauseZ, nfcCapZ, qrSurfaceZ,
+    schedule, buildTime
+  }, [blackVerts.buffer, blackTris.buffer, whiteVerts.buffer, whiteTris.buffer]);
+};
+</script>
+
+<!-- ======================================================================
+     MAIN APPLICATION CONTROLLER
+     ====================================================================== -->
+<script>
+let worker;
+let scene, camera, renderer, blackMeshObj, whiteMeshObj, blackEdgesObj, whiteEdgesObj, topCapMeshObj, currentTarget=[0,0,0];
+let clipPlane, slicerEnabled = true, showEdges = true, xrayEnabled = false;
+let autoRotate = false, isPlayingAnimation = false, playInterval = null;
+
+let camState = { theta: Math.PI*0.25, phi: Math.PI*0.35, dist: 160 };
+let targetCamState = { theta: Math.PI*0.25, phi: Math.PI*0.35, dist: 160 };
+let targetCurrentTarget = [0, 0, 0];
+
+let lastStackData = null;
+let currentLayer = 24, totalLayers = 24;
+
+// Initialize Worker
+function initWorker(){
+  const scriptText = document.getElementById('workerScript').textContent;
+  const blob = new Blob([scriptText], {type: 'application/javascript'});
+  worker = new Worker(URL.createObjectURL(blob));
+  worker.onmessage = function(e){
+    handleWorkerResult(e.data);
+  };
+}
+
+// Synchronize Sliders and Inputs
+function setupSynchronizedSliders(){
+  const sliderPairs = [
+    { num: 'blockL', range: 'blockL_slider' },
+    { num: 'blockW', range: 'blockW_slider' },
+    { num: 'wallMargin', range: 'wallMargin_slider' },
+    { num: 'clearance', range: 'clearance_slider' },
+    { num: 'baseFloorH', range: 'baseFloorH_slider' },
+    { num: 'layerH', range: 'layerH_slider' },
+    { num: 'magL', range: 'magL_slider' },
+    { num: 'magW', range: 'magW_slider' },
+    { num: 'magT', range: 'magT_slider' },
+    { num: 'gap1', range: 'gap1_slider' },
+    { num: 'nfcL', range: 'nfcL_slider' },
+    { num: 'nfcW', range: 'nfcW_slider' },
+    { num: 'nfcT', range: 'nfcT_slider' },
+    { num: 'nfcR', range: 'nfcR_slider' },
+    { num: 'nfcT2', range: 'nfcT2_slider' },
+    { num: 'capFill', range: 'capFill_slider' },
+    { num: 'qrReliefH', range: 'qrReliefH_slider' }
+  ];
+
+  sliderPairs.forEach(pair => {
+    const numEl = document.getElementById(pair.num);
+    const rangeEl = document.getElementById(pair.range);
+    if(numEl && rangeEl){
+      numEl.addEventListener('input', () => {
+        rangeEl.value = numEl.value;
+        triggerRegenerate();
+      });
+      rangeEl.addEventListener('input', () => {
+        numEl.value = rangeEl.value;
+        triggerRegenerate();
+      });
+    }
+  });
+}
+
+// Initialize Three.js Engine with Studio Lighting & Grid Bed
+function initViewer(){
+  const wrap = document.getElementById('canvasWrap');
+  scene = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(38, wrap.clientWidth/wrap.clientHeight, 0.1, 5000);
+  
+  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setSize(wrap.clientWidth, wrap.clientHeight);
+  renderer.localClippingEnabled = true;
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  wrap.appendChild(renderer.domElement);
+
+  // Prevent right-click context menu on 3D canvas
+  renderer.domElement.addEventListener('contextmenu', e => e.preventDefault());
+
+  clipPlane = new THREE.Plane(new THREE.Vector3(0, -1, 0), 100);
+
+  // STUDIO 3-POINT LIGHTING SETUP
+  const keyLight = new THREE.DirectionalLight(0xffffff, 1.1); keyLight.position.set(80,120,100); keyLight.castShadow = true; scene.add(keyLight);
+  const fillLight = new THREE.DirectionalLight(0xa5c5ff, 0.45); fillLight.position.set(-90,50,-80); scene.add(fillLight);
+  const rimLight = new THREE.DirectionalLight(0xffffff, 0.5); rimLight.position.set(0,80,-120); scene.add(rimLight);
+  scene.add(new THREE.AmbientLight(0xffffff, 0.4));
+
+  // TEXTURED BUILD PLATE GRID
+  const grid = new THREE.GridHelper(300, 30, 0x0088ff, 0x2f3644);
+  grid.position.y = -0.01; scene.add(grid);
+
+  // RGB AXIS INDICATOR
+  const axesHelper = new THREE.AxesHelper(30);
+  axesHelper.position.set(-140, 0, -140);
+  scene.add(axesHelper);
+
+  // Smooth Orbit & Right-Click Panning Navigation
+  let dragging = false, dragButton = 0, lastX = 0, lastY = 0;
+  renderer.domElement.addEventListener('pointerdown', e => {
+    dragging = true;
+    dragButton = e.button;
+    lastX = e.clientX;
+    lastY = e.clientY;
+    requestRender();
+  });
+  window.addEventListener('pointerup', () => dragging = false);
+  window.addEventListener('pointermove', e => {
+    if(!dragging) return;
+    const dx = e.clientX - lastX, dy = e.clientY - lastY;
+    lastX = e.clientX; lastY = e.clientY;
+
+    if(dragButton === 0){
+      // Left Click -> Orbit Rotation
+      targetCamState.theta -= dx * 0.007;
+      targetCamState.phi = Math.max(0.05, Math.min(Math.PI - 0.05, targetCamState.phi - dy * 0.007));
+      updateCubeRotation();
+    } else if(dragButton === 2 || dragButton === 1){
+      // Right Click or Middle Click -> Pan 3D Plane / Target
+      const forward = new THREE.Vector3();
+      camera.getWorldDirection(forward);
+      const right = new THREE.Vector3().crossVectors(forward, camera.up).normalize();
+      const up = new THREE.Vector3().crossVectors(right, forward).normalize();
+      const panSpeed = camState.dist * 0.0012;
+
+      targetCurrentTarget[0] -= (right.x * dx - up.x * dy) * panSpeed;
+      targetCurrentTarget[1] -= (right.y * dx - up.y * dy) * panSpeed;
+      targetCurrentTarget[2] -= (right.z * dx - up.z * dy) * panSpeed;
+    }
+    requestRender();
+  });
+  renderer.domElement.addEventListener('wheel', e => {
+    e.preventDefault();
+    targetCamState.dist = Math.max(20, Math.min(800, targetCamState.dist * (1 + e.deltaY * 0.001)));
+    requestRender();
+  }, { passive: false });
+
+  window.addEventListener('resize', () => {
+    camera.aspect = wrap.clientWidth / wrap.clientHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(wrap.clientWidth, wrap.clientHeight);
+    requestRender();
+  });
+
+  requestRender();
+}
+
+let isRendering = false;
+function requestRender(){
+  if(!isRendering){
+    isRendering = true;
+    requestAnimationFrame(renderLoop);
+  }
+}
+
+function renderLoop(){
+  let delta = 0;
+  camState.theta += (targetCamState.theta - camState.theta) * 0.15;
+  camState.phi += (targetCamState.phi - camState.phi) * 0.15;
+  camState.dist += (targetCamState.dist - camState.dist) * 0.15;
+
+  currentTarget[0] += (targetCurrentTarget[0] - currentTarget[0]) * 0.15;
+  currentTarget[1] += (targetCurrentTarget[1] - currentTarget[1]) * 0.15;
+  currentTarget[2] += (targetCurrentTarget[2] - currentTarget[2]) * 0.15;
+  
+  delta += Math.abs(targetCamState.theta - camState.theta);
+  delta += Math.abs(targetCamState.phi - camState.phi);
+  delta += Math.abs(targetCamState.dist - camState.dist);
+  delta += Math.abs(targetCurrentTarget[0] - currentTarget[0]);
+  delta += Math.abs(targetCurrentTarget[1] - currentTarget[1]);
+  delta += Math.abs(targetCurrentTarget[2] - currentTarget[2]);
+
+  if(autoRotate){
+    targetCamState.theta += 0.004;
+    delta += 0.01;
+  }
+
+  updateCameraPosition();
+  updateCubeRotation();
+  renderer.render(scene, camera);
+
+  if(delta > 0.0002 || autoRotate){
+    requestAnimationFrame(renderLoop);
+  } else {
+    isRendering = false;
+  }
+}
+
+function updateCameraPosition(){
+  const {theta, phi, dist} = camState;
+  const x = currentTarget[0] + dist * Math.sin(phi) * Math.cos(theta);
+  const y = currentTarget[1] + dist * Math.cos(phi);
+  const z = currentTarget[2] + dist * Math.sin(phi) * Math.sin(theta);
+  camera.position.set(x, y, z);
+  camera.lookAt(currentTarget[0], currentTarget[1], currentTarget[2]);
+}
+
+// Update View Cube Orientation
+function updateCubeRotation(){
+  const cube = document.getElementById('viewCube');
+  if(!cube) return;
+  const degX = (camState.phi - Math.PI/2) * (180/Math.PI);
+  const degY = -camState.theta * (180/Math.PI);
+  cube.style.transform = `rotateX(${degX}deg) rotateY(${degY}deg)`;
+}
+
+// Snap Camera Angles from View Cube
+function snapCamera(face){
+  if(face === 'front')     { targetCamState.theta = Math.PI*0.5;  targetCamState.phi = Math.PI*0.5; }
+  else if(face === 'back') { targetCamState.theta = -Math.PI*0.5; targetCamState.phi = Math.PI*0.5; }
+  else if(face === 'right'){ targetCamState.theta = 0;           targetCamState.phi = Math.PI*0.5; }
+  else if(face === 'left') { targetCamState.theta = Math.PI;     targetCamState.phi = Math.PI*0.5; }
+  else if(face === 'top')  { targetCamState.theta = Math.PI*0.5;  targetCamState.phi = 0.05; }
+  else if(face === 'bottom'){targetCamState.theta = Math.PI*0.5;  targetCamState.phi = Math.PI-0.05; }
+  else if(face === 'iso')  { targetCamState.theta = Math.PI*0.25; targetCamState.phi = Math.PI*0.35; }
+  requestRender();
+}
+
+function handleWorkerResult(data){
+  lastStackData = data;
+
+  const blackGeo = new THREE.BufferGeometry();
+  blackGeo.setAttribute('position', new THREE.BufferAttribute(data.blackVerts, 3));
+  blackGeo.setIndex(new THREE.BufferAttribute(data.blackTris, 1));
+  applyYZSwap(blackGeo);
+  blackGeo.computeVertexNormals();
+
+  const whiteGeo = new THREE.BufferGeometry();
+  whiteGeo.setAttribute('position', new THREE.BufferAttribute(data.whiteVerts, 3));
+  whiteGeo.setIndex(new THREE.BufferAttribute(data.whiteTris, 1));
+  applyYZSwap(whiteGeo);
+  whiteGeo.computeVertexNormals();
+
+  if(blackMeshObj) scene.remove(blackMeshObj);
+  if(whiteMeshObj) scene.remove(whiteMeshObj);
+  if(blackEdgesObj) scene.remove(blackEdgesObj);
+  if(whiteEdgesObj) scene.remove(whiteEdgesObj);
+
+  // Studio SATIN PBR Materials
+  const blackMat = new THREE.MeshStandardMaterial({
+    color: 0x1d2127, roughness: 0.35, metalness: 0.12,
+    clippingPlanes: (slicerEnabled || xrayEnabled) ? [clipPlane] : [], clipShadows: true
+  });
+  const whiteMat = new THREE.MeshStandardMaterial({
+    color: 0xf5f6f8, roughness: 0.45, metalness: 0.05,
+    clippingPlanes: (slicerEnabled || xrayEnabled) ? [clipPlane] : [], clipShadows: true
+  });
+
+  blackMeshObj = new THREE.Mesh(blackGeo, blackMat);
+  whiteMeshObj = new THREE.Mesh(whiteGeo, whiteMat);
+  scene.add(blackMeshObj);
+  scene.add(whiteMeshObj);
+
+  // Crisp CAD Edge Lines
+  if(showEdges){
+    const blackEdges = new THREE.EdgesGeometry(blackGeo, 15);
+    const whiteEdges = new THREE.EdgesGeometry(whiteGeo, 15);
+    const lineMat = new THREE.LineBasicMaterial({ color: 0x4a5568, linewidth: 1.5 });
+    blackEdgesObj = new THREE.LineSegments(blackEdges, lineMat);
+    whiteEdgesObj = new THREE.LineSegments(whiteEdges, lineMat);
+    scene.add(blackEdgesObj);
+    scene.add(whiteEdgesObj);
+  }
+
+  const p = readParams();
+  if(!lastStackData) targetCurrentTarget = [0, data.totalHeight/2, 0];
+
+  const layerH = p.baseFloorH > 0 ? (parseFloat(document.getElementById('layerH').value) || 0.2) : (parseFloat(document.getElementById('layerH').value) || 0.2);
+  totalLayers = Math.max(1, Math.ceil(data.totalHeight / layerH));
+  
+  const layerSlider = document.getElementById('layerSlider');
+  layerSlider.max = totalLayers;
+  if(currentLayer > totalLayers || currentLayer === 24){
+    currentLayer = totalLayers;
+  }
+  layerSlider.value = currentLayer;
+
+  updateSlicerState();
+
+  // Model HUD Stats
+  const vol_cm3 = (p.blockL * p.blockW * data.totalHeight / 1000).toFixed(1);
+  const mass_g = (vol_cm3 * 1.24).toFixed(1);
+  document.getElementById('hudDimensions').textContent = `${p.blockL} × ${p.blockW} × ${data.totalHeight.toFixed(2)} mm`;
+  document.getElementById('hudVolume').textContent = `Volume: ~${vol_cm3} cm³`;
+  document.getElementById('hudWeight').textContent = `PLA Mass: ~${mass_g} g`;
+
+  // Update Schedule & Schematic
+  document.getElementById('scheduleList').innerHTML = data.schedule.map(s => `
+    <div class="step-card ${s.kind==='insert'?'insert':''}">
+      <div class="z">Z ${s.z.toFixed(2)} mm</div>
+      <div class="title">${s.label}</div>
+      <div class="desc">${s.detail}</div>
+    </div>
+  `).join('');
+
+  drawSchematic(p, data);
+
+  document.getElementById('dlStl').disabled = false;
+  document.getElementById('dl3mf').disabled = false;
+
+  requestRender();
+}
+
+function applyYZSwap(geo){
+  const pos = geo.attributes.position;
+  for(let i=0; i<pos.count; i++){
+    const y = pos.getY(i), z = pos.getZ(i);
+    pos.setY(i, z);
+    pos.setZ(i, y);
+  }
+}
+
+/* ======================================================================
+   3D PRINTER SLICER LAYER INSPECTOR ENGINE
+   ====================================================================== */
+function updateSlicerState(){
+  if(!lastStackData) return;
+  const p = readParams();
+  const layerH = parseFloat(document.getElementById('layerH').value) || 0.2;
+  currentLayer = parseInt(document.getElementById('layerSlider').value) || totalLayers;
+
+  const currentZ = Math.min(lastStackData.totalHeight, currentLayer * layerH);
+
+  clipPlane.constant = currentZ;
+
+  let featureTag = "Solid Body Shell";
+  if(currentZ <= p.baseFloorH && p.baseFloorH > 0){
+    featureTag = "Base Floor Layers";
+  } else if(currentZ > lastStackData.magnetPauseZ && currentZ <= lastStackData.magnetCapZ){
+    featureTag = "Magnet Pocket Void (Pause & Insert)";
+  } else if(currentZ > lastStackData.magnetCapZ && currentZ <= lastStackData.nfcPauseZ){
+    featureTag = "Magnet-NFC Spacer Fill";
+  } else if(currentZ > lastStackData.nfcPauseZ && currentZ <= lastStackData.nfcCapZ){
+    featureTag = "NFC Pocket Void (Pause & Insert)";
+  } else if(currentZ > lastStackData.nfcCapZ && currentZ <= lastStackData.qrSurfaceZ){
+    featureTag = "Cap Fill (QR Background)";
+  } else if(currentZ > lastStackData.qrSurfaceZ){
+    featureTag = "QR Relief Pillars (White Filament)";
+  }
+
+  document.getElementById('slicerLayerText').textContent = `Layer ${currentLayer} / ${totalLayers}`;
+  document.getElementById('slicerZText').textContent = `Z = ${currentZ.toFixed(2)} mm`;
+  document.getElementById('slicerFeatureText').textContent = featureTag;
+
+  renderTopSliceCap(currentZ, p);
+  requestRender();
+}
+
+function renderTopSliceCap(zVal, p){
+  if(topCapMeshObj){
+    scene.remove(topCapMeshObj);
+    topCapMeshObj = null;
+  }
+}
+
+function togglePlaySlicer(){
+  isPlayingAnimation = !isPlayingAnimation;
+  const btn = document.getElementById('layerPlayBtn');
+  btn.textContent = isPlayingAnimation ? '⏸' : '▶';
+  btn.classList.toggle('play', !isPlayingAnimation);
+
+  if(isPlayingAnimation){
+    if(currentLayer >= totalLayers) currentLayer = 1;
+    playInterval = setInterval(() => {
+      currentLayer++;
+      if(currentLayer > totalLayers){
+        currentLayer = totalLayers;
+        togglePlaySlicer();
+      }
+      document.getElementById('layerSlider').value = currentLayer;
+      updateSlicerState();
+    }, 150);
+  } else {
+    clearInterval(playInterval);
+  }
+}
+
+/* ======================================================================
+   DYNAMIC 2D SCHEMATIC
+   ====================================================================== */
+function drawSchematic(p, data){
+  const svg = document.getElementById('schematicSvg');
+  const W = 340, H = 180;
+  const padX = 40, padY = 25;
+  const drawW = W - padX*2, drawH = H - padY*2;
+
+  const totalH = data.totalHeight || 1;
+  const scaleY = drawH / totalH;
+  const scaleX = drawW / Math.max(p.blockL, p.blockW);
+
+  const blockW_px = p.blockL * scaleX;
+  const startX = (W - blockW_px)/2;
+
+  function getSvgY(zVal){ return (H - padY) - (zVal * scaleY); }
+
+  let html = `<rect x="0" y="0" width="${W}" height="${H}" fill="transparent"/>`;
+
+  // Base Floor
+  const baseFloorH_px = p.baseFloorH * scaleY;
+  html += `<rect x="${startX}" y="${getSvgY(p.baseFloorH)}" width="${blockW_px}" height="${baseFloorH_px}" fill="#2a2f3d" stroke="#3b4252" stroke-width="1"/>`;
+
+  // Magnet Pocket
+  const magW_px = (p.magL + p.clearance*2) * scaleX;
+  const magX = (W - magW_px)/2;
+  const magTopY = getSvgY(data.magnetCapZ);
+  const magHeight_px = p.magT * scaleY;
+  html += `<rect x="${startX}" y="${magTopY}" width="${blockW_px}" height="${magHeight_px}" fill="#2a2f3d" stroke="#3b4252" stroke-width="1"/>`;
+  html += `<rect x="${magX}" y="${magTopY}" width="${magW_px}" height="${magHeight_px}" fill="var(--insert-bg)" stroke="var(--insert-color)" stroke-width="1.5" stroke-dasharray="3,3"/>`;
+  html += `<text x="${W/2}" y="${magTopY + magHeight_px/2 + 3}" fill="var(--insert-color)" font-size="9.5" font-family="var(--font-mono)" text-anchor="middle">Magnet Pocket</text>`;
+
+  // Spacer
+  const gap1TopY = getSvgY(data.nfcPauseZ);
+  const gap1H_px = p.gap1 * scaleY;
+  html += `<rect x="${startX}" y="${gap1TopY}" width="${blockW_px}" height="${gap1H_px}" fill="#1e222b" stroke="#3b4252" stroke-width="1"/>`;
+
+  // NFC Pocket
+  const nfcSpan = p.nfcShape==='circ' ? p.nfcR*2 : p.nfcL;
+  const nfcT = p.nfcShape==='circ' ? p.nfcT2 : p.nfcT;
+  const nfcW_px = (nfcSpan + p.clearance*2) * scaleX;
+  const nfcX = (W - nfcW_px)/2;
+  const nfcTopY = getSvgY(data.nfcCapZ);
+  const nfcH_px = nfcT * scaleY;
+  html += `<rect x="${startX}" y="${nfcTopY}" width="${blockW_px}" height="${nfcH_px}" fill="#2a2f3d" stroke="#3b4252" stroke-width="1"/>`;
+  html += `<rect x="${nfcX}" y="${nfcTopY}" width="${nfcW_px}" height="${nfcH_px}" fill="var(--insert-bg)" stroke="var(--insert-color)" stroke-width="1.5" stroke-dasharray="3,3"/>`;
+  html += `<text x="${W/2}" y="${nfcTopY + nfcH_px/2 + 3}" fill="var(--insert-color)" font-size="9" font-family="var(--font-mono)" text-anchor="middle">NFC Tag</text>`;
+
+  // Cap Fill
+  const capTopY = getSvgY(data.qrSurfaceZ);
+  const capH_px = p.capFill * scaleY;
+  html += `<rect x="${startX}" y="${capTopY}" width="${blockW_px}" height="${capH_px}" fill="#181b22" stroke="#3b4252" stroke-width="1"/>`;
+
+  // QR Relief
+  const qrTopY = getSvgY(data.totalHeight);
+  const qrH_px = p.qrReliefH * scaleY;
+  html += `<rect x="${startX}" y="${qrTopY}" width="${blockW_px}" height="${qrH_px}" fill="var(--text-main)" stroke="#fff" stroke-width="1"/>`;
+  html += `<text x="${W/2}" y="${qrTopY - 4}" fill="var(--text-main)" font-size="9.5" font-family="var(--font-mono)" text-anchor="middle">QR Surface Z=${data.totalHeight.toFixed(2)}mm</text>`;
+
+  // Slicer Active Line
+  const slicerLineY = getSvgY(Math.min(data.totalHeight, currentLayer * (parseFloat(document.getElementById('layerH').value)||0.2)));
+  html += `<line x1="${startX - 15}" y1="${slicerLineY}" x2="${startX + blockW_px + 15}" y2="${slicerLineY}" stroke="var(--accent-blue)" stroke-width="2" stroke-dasharray="4,2"/>`;
+
+  svg.innerHTML = html;
+}
+
+// Collapsible Tree Sections
+function toggleSection(secId){
+  const el = document.getElementById(secId);
+  const arrow = document.getElementById(secId + '_arrow');
+  if(el){
+    const isHidden = el.style.display === 'none';
+    el.style.display = isHidden ? 'flex' : 'none';
+    if(arrow) arrow.textContent = isHidden ? '▼' : '▶';
+  }
+}
+
+/* ======================================================================
+   UI EVENT WIRING & PRESETS
+   ====================================================================== */
+let baseFloorMode = '0';
+let nfcShape = 'rect';
+
+function setupSegs(){
+  document.querySelectorAll('#baseFloorSeg button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#baseFloorSeg button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      baseFloorMode = btn.dataset.val;
+      document.getElementById('baseFloorCustomRow').style.display = baseFloorMode==='custom' ? 'grid' : 'none';
+      triggerRegenerate();
+    });
+  });
+  document.querySelectorAll('#nfcShapeSeg button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#nfcShapeSeg button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      nfcShape = btn.dataset.val;
+      document.getElementById('nfcRectRow').style.display = nfcShape==='rect' ? 'grid' : 'none';
+      document.getElementById('nfcCircRow').style.display = nfcShape==='circ' ? 'grid' : 'none';
+      triggerRegenerate();
+    });
+  });
+}
+
+function applyPreset(category, p1, p2, p3, p4){
+  if(category === 'mag'){
+    setFieldValue('magL', p1); setFieldValue('magW', p2); setFieldValue('magT', p3);
+    showToast(`Applied Magnet Preset: ${p1}×${p2}×${p3}mm`);
+  } else if(category === 'nfc'){
+    nfcShape = p1;
+    document.querySelectorAll('#nfcShapeSeg button').forEach(b => b.classList.toggle('active', b.dataset.val === p1));
+    document.getElementById('nfcRectRow').style.display = p1==='rect' ? 'grid' : 'none';
+    document.getElementById('nfcCircRow').style.display = p1==='circ' ? 'grid' : 'none';
+    if(p1 === 'rect'){
+      setFieldValue('nfcL', p2); setFieldValue('nfcW', p3); setFieldValue('nfcT', p4);
+      showToast(`Applied NFC Rect Preset: ${p2}×${p3}×${p4}mm`);
+    } else {
+      setFieldValue('nfcR', p2); setFieldValue('nfcT2', p3);
+      showToast(`Applied NFC Round Preset: Ø${p2*2}×${p3}mm`);
+    }
+  }
+  triggerRegenerate();
+}
+
+function setFieldValue(id, val){
+  const numEl = document.getElementById(id);
+  const rangeEl = document.getElementById(id + '_slider');
+  if(numEl) numEl.value = val;
+  if(rangeEl) rangeEl.value = val;
+}
+
+function readParams(){
+  const num = id => parseFloat(document.getElementById(id).value) || 0;
+  const baseFloorH = baseFloorMode==='custom' ? num('baseFloorH') : 0;
+  return {
+    blockL: num('blockL'), blockW: num('blockW'),
+    wallMargin: num('wallMargin'), clearance: num('clearance'),
+    baseFloorH,
+    magL: num('magL'), magW: num('magW'), magT: num('magT'),
+    gap1: num('gap1'),
+    nfcShape,
+    nfcL: num('nfcL'), nfcW: num('nfcW'), nfcT: num('nfcT'),
+    nfcR: num('nfcR'), nfcT2: num('nfcT2'),
+    capFill: num('capFill'),
+    qrReliefH: num('qrReliefH'),
+    qrEcc: document.getElementById('qrEcc').value,
+    url: document.getElementById('qrUrl').value.trim()
+  };
+}
+
+function validate(p){
+  const errs = [];
+  const nfcSpanL = p.nfcShape==='circ' ? p.nfcR*2 : p.nfcL;
+  const nfcSpanW = p.nfcShape==='circ' ? p.nfcR*2 : p.nfcW;
+  if(p.magL + p.clearance*2 + p.wallMargin*2 > p.blockL || p.magW + p.clearance*2 + p.wallMargin*2 > p.blockW)
+    errs.push('Magnet pocket exceeds block footprint margin.');
+  if(nfcSpanL + p.clearance*2 + p.wallMargin*2 > p.blockL || nfcSpanW + p.clearance*2 + p.wallMargin*2 > p.blockW)
+    errs.push('NFC pocket exceeds block footprint margin.');
+  if(p.gap1 < 0.4) errs.push('Spacer thickness is thin (suggest ≥ 0.4mm).');
+  if(p.capFill < 0.4) errs.push('Cap fill thickness is thin (suggest ≥ 0.4mm).');
+  if(!p.url) errs.push('Enter a URL or text string to encode.');
+  return errs;
+}
+
+let debounceTimer = null;
+function triggerRegenerate(){
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(doRegenerate, 50);
+}
+
+function doRegenerate(){
+  const p = readParams();
+  const errs = validate(p);
+  const vBox = document.getElementById('validation');
+  vBox.innerHTML = errs.length ? errs.map(e => `<div class="err" style="color:var(--danger); font-size:11px;">⚠ ${e}</div>`).join('') : '';
+
+  document.getElementById('dlStl').disabled = errs.length > 0;
+  document.getElementById('dl3mf').disabled = errs.length > 0;
+
+  if(errs.length) return;
+
+  let qrGrid = [];
+  try {
+    const qr = qrcode(0, p.qrEcc);
+    qr.addData(p.url);
+    qr.make();
+    const n = qr.getModuleCount();
+    for(let r=0; r<n; r++){
+      const row = [];
+      for(let c=0; c<n; c++) row.push(qr.isDark(r,c));
+      qrGrid.push(row);
+    }
+  } catch(e){
+    vBox.innerHTML += `<div class="err" style="color:var(--danger)">⚠ QR Encoding Error: ${e.message}</div>`;
+    return;
+  }
+
+  p.qrGrid = qrGrid;
+  worker.postMessage(p);
+}
+
+// Toast Notifications
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+// Exporters
+function downloadBlob(blob, filename){
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
+function exportSTL(){
+  if(!lastStackData) return;
+  showToast('Generating STL Mesh...');
+  setTimeout(() => {
+    const {blackVerts, blackTris, whiteVerts, whiteTris} = lastStackData;
+    const triCount = (blackTris.length + whiteTris.length) / 3;
+    const buf = new ArrayBuffer(84 + triCount * 50);
+    const dv = new DataView(buf);
+    dv.setUint32(80, triCount, true);
+    let offset = 84;
+
+    function writeMesh(verts, tris){
+      for(let i=0; i<tris.length; i+=3){
+        const a = tris[i]*3, b = tris[i+1]*3, c = tris[i+2]*3;
+        const Ax = verts[a], Ay = verts[a+2], Az = verts[a+1];
+        const Bx = verts[b], By = verts[b+2], Bz = verts[b+1];
+        const Cx = verts[c], Cy = verts[c+2], Cz = verts[c+1];
+
+        const ux = Bx-Ax, uy = By-Ay, uz = Bz-Az;
+        const vx = Cx-Ax, vy = Cy-Ay, vz = Cz-Az;
+        let nx = uy*vz - uz*vy, ny = uz*vx - ux*vz, nz = ux*vy - uy*vx;
+        const len = Math.hypot(nx,ny,nz)||1; nx/=len; ny/=len; nz/=len;
+
+        dv.setFloat32(offset, nx, true); dv.setFloat32(offset+4, ny, true); dv.setFloat32(offset+8, nz, true);
+        const pts = [[Ax,Ay,Az], [Bx,By,Bz], [Cx,Cy,Cz]];
+        for(let k=0; k<3; k++){
+          dv.setFloat32(offset+12+k*12, pts[k][0], true);
+          dv.setFloat32(offset+12+k*12+4, pts[k][1], true);
+          dv.setFloat32(offset+12+k*12+8, pts[k][2], true);
+        }
+        dv.setUint16(offset+48, 0, true);
+        offset += 50;
+      }
+    }
+    writeMesh(blackVerts, blackTris);
+    writeMesh(whiteVerts, whiteTris);
+
+    const blob = new Blob([buf], {type: 'application/octet-stream'});
+    downloadBlob(blob, '3qr-block.stl');
+    showToast('STL Download Ready!');
+  }, 50);
+}
+
+async function export3MF(){
+  if(!lastStackData) return;
+  showToast('Generating 3MF multi-color package...');
+  setTimeout(async () => {
+    const {blackVerts, blackTris, whiteVerts, whiteTris} = lastStackData;
+
+    function meshXML(verts, tris){
+      let v = '<vertices>';
+      for(let i=0; i<verts.length; i+=3){
+        v += `<vertex x="${verts[i].toFixed(4)}" y="${verts[i+2].toFixed(4)}" z="${verts[i+1].toFixed(4)}"/>`;
+      }
+      v += '</vertices><triangles>';
+      for(let i=0; i<tris.length; i+=3){
+        v += `<triangle v1="${tris[i]}" v2="${tris[i+1]}" v3="${tris[i+2]}"/>`;
+      }
+      v += '</triangles>';
+      return v;
+    }
+
+    const model = `<?xml version="1.0" encoding="UTF-8"?>
+<model unit="millimeter" xml:lang="en-US" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02">
+  <resources>
+    <basematerials id="1">
+      <base name="Black" displaycolor="#1A1A1AFF"/>
+      <base name="White" displaycolor="#F2F2F2FF"/>
+    </basematerials>
+    <object id="2" type="model" pid="1" pindex="0">
+      <mesh>${meshXML(blackVerts, blackTris)}</mesh>
+    </object>
+    <object id="3" type="model" pid="1" pindex="1">
+      <mesh>${meshXML(whiteVerts, whiteTris)}</mesh>
+    </object>
+  </resources>
+  <build>
+    <item objectid="2"/>
+    <item objectid="3"/>
+  </build>
+</model>`;
+
+    const zip = new JSZip();
+    zip.file('[Content_Types].xml', `<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="model" ContentType="application/vnd.ms-package.3dmanufacturing-3dmodel+xml"/></Types>`);
+    zip.file('_rels/.rels', `<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Target="/3D/3dmodel.model" Id="rel0" Type="http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel"/></Relationships>`);
+    zip.file('3D/3dmodel.model', model);
+
+    const blob = await zip.generateAsync({type: 'blob', mimeType: 'application/vnd.ms-package.3dmanufacturing-3dmodel'});
+    downloadBlob(blob, '3qr-block.3mf');
+    showToast('3MF Download Ready!');
+  }, 50);
+}
+
+// Initialization
+function init(){
+  initWorker();
+  initViewer();
+  setupSegs();
+  setupSynchronizedSliders();
+
+  document.getElementById('qrUrl').addEventListener('input', triggerRegenerate);
+  document.getElementById('qrEcc').addEventListener('change', triggerRegenerate);
+
+  // Slicer Controls
+  document.getElementById('layerSlider').addEventListener('input', updateSlicerState);
+  document.getElementById('layerUpBtn').addEventListener('click', () => { if(currentLayer < totalLayers){ currentLayer++; document.getElementById('layerSlider').value = currentLayer; updateSlicerState(); } });
+  document.getElementById('layerDownBtn').addEventListener('click', () => { if(currentLayer > 1){ currentLayer--; document.getElementById('layerSlider').value = currentLayer; updateSlicerState(); } });
+  document.getElementById('layerPlayBtn').addEventListener('click', togglePlaySlicer);
+  document.getElementById('slicerResetBtn').addEventListener('click', () => { currentLayer = totalLayers; document.getElementById('layerSlider').value = currentLayer; updateSlicerState(); });
+
+  // Top Action Tools
+  document.getElementById('modeEdgesBtn').addEventListener('click', () => {
+    showEdges = !showEdges;
+    document.getElementById('modeEdgesBtn').classList.toggle('active', showEdges);
+    if(blackEdgesObj) blackEdgesObj.visible = showEdges;
+    if(whiteEdgesObj) whiteEdgesObj.visible = showEdges;
+    requestRender();
+  });
+
+  document.getElementById('modeXrayBtn').addEventListener('click', () => {
+    xrayEnabled = !xrayEnabled;
+    document.getElementById('modeXrayBtn').classList.toggle('active', xrayEnabled);
+    if(blackMeshObj) blackMeshObj.material.clippingPlanes = (slicerEnabled || xrayEnabled) ? [clipPlane] : [];
+    if(whiteMeshObj) whiteMeshObj.material.clippingPlanes = (slicerEnabled || xrayEnabled) ? [clipPlane] : [];
+    requestRender();
+  });
+
+  document.getElementById('resetCamBtn').addEventListener('click', () => {
+    if(lastStackData) targetCurrentTarget = [0, lastStackData.totalHeight/2, 0];
+    snapCamera('iso');
+  });
+
+  document.getElementById('themeToggleBtn').addEventListener('click', () => {
+    const root = document.documentElement;
+    const cur = root.getAttribute('data-theme');
+    root.setAttribute('data-theme', cur==='light' ? 'dark' : 'light');
+    requestRender();
+  });
+
+  document.getElementById('dlStl').addEventListener('click', exportSTL);
+  document.getElementById('dl3mf').addEventListener('click', export3MF);
+
+  triggerRegenerate();
+}
+
+window.addEventListener('load', init);
+</script>
+</body>
+</html>
