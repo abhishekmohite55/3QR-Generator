@@ -964,7 +964,30 @@ function init(){
   if(layerPlayBtnEl) layerPlayBtnEl.addEventListener('click', togglePlaySlicer);
   if(slicerResetBtnEl) slicerResetBtnEl.addEventListener('click', () => { currentLayer = totalLayers; if(layerSliderEl) layerSliderEl.value = currentLayer; updateSlicerState(); });
 
-  // Top Action Tools
+  // Workspace Mode Tabs
+  const tabPrepare = document.getElementById('tabPrepare');
+  const tabSlicer = document.getElementById('tabSlicer');
+  const slicerBar = document.getElementById('slicerBar');
+
+  if(tabPrepare && tabSlicer){
+    tabPrepare.addEventListener('click', () => {
+      tabPrepare.classList.add('active');
+      tabSlicer.classList.remove('active');
+      if(slicerBar) slicerBar.style.display = 'none';
+      blackMeshObj.material.clippingPlanes = [];
+      whiteMeshObj.material.clippingPlanes = [];
+      requestRender();
+    });
+    tabSlicer.addEventListener('click', () => {
+      tabSlicer.classList.add('active');
+      tabPrepare.classList.remove('active');
+      if(slicerBar) slicerBar.style.display = 'flex';
+      blackMeshObj.material.clippingPlanes = [clipPlane];
+      whiteMeshObj.material.clippingPlanes = [clipPlane];
+      updateSlicerState();
+      requestRender();
+    });
+  }
   const modeEdgesBtn = document.getElementById('modeEdgesBtn');
   const modeXrayBtn = document.getElementById('modeXrayBtn');
   const resetCamBtn = document.getElementById('resetCamBtn');
@@ -984,8 +1007,18 @@ function init(){
     modeXrayBtn.addEventListener('click', () => {
       xrayEnabled = !xrayEnabled;
       modeXrayBtn.classList.toggle('active', xrayEnabled);
-      if(blackMeshObj) blackMeshObj.material.clippingPlanes = (slicerEnabled || xrayEnabled) ? [clipPlane] : [];
-      if(whiteMeshObj) whiteMeshObj.material.clippingPlanes = (slicerEnabled || xrayEnabled) ? [clipPlane] : [];
+      if(blackMeshObj){
+        blackMeshObj.material.transparent = xrayEnabled;
+        blackMeshObj.material.opacity = xrayEnabled ? 0.35 : 1.0;
+        blackMeshObj.material.depthWrite = !xrayEnabled;
+        blackMeshObj.material.needsUpdate = true;
+      }
+      if(whiteMeshObj){
+        whiteMeshObj.material.transparent = xrayEnabled;
+        whiteMeshObj.material.opacity = xrayEnabled ? 0.45 : 1.0;
+        whiteMeshObj.material.depthWrite = !xrayEnabled;
+        whiteMeshObj.material.needsUpdate = true;
+      }
       requestRender();
     });
   }
